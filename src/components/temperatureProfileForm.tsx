@@ -194,7 +194,7 @@ export const TemperatureProfileForm: React.FC = () => {
   );
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <div>Loading...Wait...</div>;
   }
 
   return (
@@ -202,7 +202,9 @@ export const TemperatureProfileForm: React.FC = () => {
       <h2 className="mb-4 text-center text-2xl font-bold text-gray-800">
         {isExistingProfile ? "Update" : "Create"} Temperature Profile
       </h2>
-      <h3>Modified by Reuben</h3>
+      <h3 className="mb-4 text-center text-2xl font-bold text-gray-800">
+         Modified by Reuben
+      </h3>
       <form
         onSubmit={handleSubmit(onSubmit)}
         className="space-y-4 text-gray-800"
