@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { api } from "~/trpc/react";
+import { apiR } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
 
 interface TemperatureData {
@@ -31,7 +31,7 @@ export function TemperatureIntervalsButton() {
   const [showData, setShowData] = useState(false);
   const [selectedInterval, setSelectedInterval] = useState<number | null>(null);
 
-  const { data, isLoading, error, refetch } = api.user.getTemperatureIntervals.useQuery(
+  const { data, isLoading, error, refetch } = apiR.user.getTemperatureIntervals.useQuery(
     undefined,
     { enabled: showData }
   );
