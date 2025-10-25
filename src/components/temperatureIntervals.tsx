@@ -81,7 +81,7 @@ export function TemperatureIntervalsButton() {
 
           {data?.intervals && data.intervals.length === 0 && (
             <div className="text-center p-8 text-gray-500">
-              No temperature interval data available.
+              {data.message || "No temperature interval data available yet. Sleep data will appear after using your mattress."}
             </div>
           )}
 

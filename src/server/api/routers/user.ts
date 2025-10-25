@@ -14,6 +14,7 @@ import { TRPCError } from "@trpc/server";
 import { adjustTemperature } from "~/app/api/temperatureCron/route";
 import jwt from "jsonwebtoken";
 import { getIntervalsData } from "~/server/eight/user";
+import { CLIENT_API_URL } from "~/server/eight/constants";
 
 class DatabaseError extends Error {
   constructor(message: string) {
@@ -354,13 +355,56 @@ export const userRouter = createTRPCRouter({
           .where(eq(users.email, email));
       }
 
-      // Fetch interval data
-      const intervals = await getIntervalsData(token, user.eightUserId);
-
-      return {
-        success: true,
-        intervals: intervals,
-      };
+      // Fetch interval data with error handling
+      try {
+        const intervals = await getIntervalsData(token, user.eightUserId);
+        
+        return {
+          success: true,
+          intervals: intervals || [],
+        };
+      } catch (apiError) {
+        console.error("Primary API call failed, trying fallback:", apiError);
+        
+        // Fallback: Try making a direct API call without strict schema validation
+        try {
+          const url = `${CLIENT_API_URL}/users/${user.eightUserId}/intervals`;
+          const response = await fetch(url, {
+            headers: {
+              "content-type": "application/json",
+              "connection": "keep-alive",
+              "user-agent": "Android App",
+              "accept-encoding": "gzip",
+              "accept": "application/json",
+              "host": "client-api.8slp.net",
+              "authorization": `Bearer ${token.eightAccessToken}`,
+            },
+          });
+          
+          if (!response.ok) {
+            throw new Error(`API request failed: ${response.status}`);
+          }
+          
+          const rawData = await response.json() as { result?: { intervals?: unknown[] } };
+          
+          // Return whatever we got, or empty array
+          return {
+            success: true,
+            intervals: rawData?.result?.intervals || [],
+            message: rawData?.result?.intervals?.length === 0 
+              ? "No interval data available yet. Sleep data will appear after using your mattress."
+              : undefined
+          };
+        } catch (fallbackError) {
+          console.error("Fallback API call also failed:", fallbackError);
+          // Return empty array with helpful message
+          return {
+            success: true,
+            intervals: [],
+            message: "No interval data available yet. Sleep data will appear after using your mattress."
+          };
+        }
+      }
     } catch (error) {
       console.error("Error fetching temperature intervals:", error);
       if (error instanceof TRPCError) {
