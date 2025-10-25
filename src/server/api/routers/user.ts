@@ -13,6 +13,7 @@ import { type Token } from "~/server/eight/types";
 import { TRPCError } from "@trpc/server";
 import { adjustTemperature } from "~/app/api/temperatureCron/route";
 import jwt from "jsonwebtoken";
+import { getIntervalsData } from "~/server/eight/user";
 
 class DatabaseError extends Error {
   constructor(message: string) {
@@ -304,6 +305,71 @@ export const userRouter = createTRPCRouter({
         code: "INTERNAL_SERVER_ERROR",
         message:
           "An unexpected error occurred while deleting the user temperature profile.",
+      });
+    }
+  }),
+
+  getTemperatureIntervals: publicProcedure.query(async ({ ctx }) => {
+    try {
+      const decoded = await checkAuthCookie(ctx.headers);
+      const email = decoded.email;
+
+      // Get user from database
+      const userList = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, email))
+        .execute();
+
+      if (userList.length !== 1 || userList[0] === undefined) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found.",
+        });
+      }
+
+      const user = userList[0];
+
+      // Create token object
+      let token: Token = {
+        eightAccessToken: user.eightAccessToken,
+        eightRefreshToken: user.eightRefreshToken,
+        eightExpiresAtPosix: user.eightTokenExpiresAt.getTime(),
+        eightUserId: user.eightUserId,
+      };
+
+      // Refresh token if expired
+      if (new Date().getTime() > token.eightExpiresAtPosix) {
+        token = await obtainFreshAccessToken(
+          token.eightRefreshToken,
+          token.eightUserId,
+        );
+        await db
+          .update(users)
+          .set({
+            eightAccessToken: token.eightAccessToken,
+            eightRefreshToken: token.eightRefreshToken,
+            eightTokenExpiresAt: new Date(token.eightExpiresAtPosix),
+          })
+          .where(eq(users.email, email));
+      }
+
+      // Fetch interval data
+      const intervals = await getIntervalsData(token, user.eightUserId);
+
+      return {
+        success: true,
+        intervals: intervals,
+      };
+    } catch (error) {
+      console.error("Error fetching temperature intervals:", error);
+      if (error instanceof TRPCError) {
+        throw error;
+      }
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message:
+          "An unexpected error occurred while fetching temperature intervals.",
       });
     }
   }),
